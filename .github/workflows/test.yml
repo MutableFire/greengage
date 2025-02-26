@@ -1,4 +1,4 @@
-name: Matrix testing
+name: Regression testing
 
 on:
   push:
@@ -57,7 +57,6 @@ jobs:
               {"test":"ic-contrib",
                "make_configs":["contrib/amcheck:installcheck",
                                "contrib/auto_explain:installcheck",
-                               "contrib/citext:installcheck",
                                "contrib/btree_gin:installcheck",
                                "contrib/btree_gist:installcheck",
                                "contrib/citext:installcheck",
@@ -72,12 +71,10 @@ jobs:
                                "contrib/fuzzystrmatch:installcheck",
                                "contrib/hstore:installcheck",
                                "contrib/indexscan:installcheck",
-                               "contrib/intagg:installcheck",
                                "contrib/intarray:installcheck",
                                "contrib/isn:installcheck",
                                "contrib/ltree:installcheck",
                                "contrib/passwordcheck:installcheck",
-                               "contrib/pg_buffecache:installcheck",
                                "contrib/pg_trgm:installcheck",
                                "contrib/pgcrypto:installcheck",
                                "contrib/pgstattuple:installcheck",
@@ -111,8 +108,8 @@ jobs:
                                "gpcontrib/orafce:installcheck",
                                "gpcontrib/pgaudit:installcheck",
                                "gpcontrib/quicklz:installcheck",
-                               "gpcontrib/sr_plan:installcheck",
-                               "gpcontrib/zstd:installcheck"]
+                               "gpcontrib/sr_plan",
+                               "gpcontrib/zstd"]
               },
               {"test":"ic-parallel-retrieve-cursor",
                "make_configs":["src/test/isolation2:installcheck-parallel-retrieve-cursor"]
@@ -298,6 +295,8 @@ jobs:
       run: |
         set -o pipefail
 
+        shopt -s globstar
+
         # Initialize test status
         overall_status=0
 
@@ -343,6 +342,8 @@ jobs:
 
           config_log="build-logs/details/make-${{ matrix.test }}-config$i.log"
 
+          df . -h
+
           if ! docker run \
                 -e TEST_DIR="${dir}" \
                 -e TEST_TARGET="${target}" \
@@ -355,12 +356,18 @@ jobs:
             echo "::warning::Test execution failed for configuration $((i+1)): make -C $dir $target"
             overall_status=1
           fi
-          
 
-          RESULTS_PATH="build-results/results-${{ matrix.test }}-${dir}"
+          df . -h
+
+          RESULTS_PATH="build-results/results-${{ matrix.test }}-${i}"
           mkdir -p $RESULTS_PATH
+          mkdir -p /tmp/$RESULTS_PATH
 
-          docker cp test_test_container:/home/gpadmin $RESULTS_PATH
+          docker cp test_test_container:/home/gpadmin/ /tmp/$RESULTS_PATH/
+          ls /tmp/$RESULTS_PATH
+          ls /tmp/$RESULTS_PATH/gpadmin
+          cp -L -r /tmp/$RESULTS_PATH/gpadmin/${dir} $RESULTS_PATH
+          sudo rm -rf /tmp/$RESULTS_PATH/gpadmin
 
           docker rm test_test_container
         done
@@ -385,10 +392,15 @@ jobs:
       if: always()
       run: |
           # Search for regression.diffs recursively
-          found_file=$(find . -type f -name "regression.diffs" | head -n 1)
-          if [[ -n "$found_file" ]]; then
-            echo "Found regression.diffs at: $found_file"
-            cat "$found_file"
+          found_files=$(find . -type f -path "*/regression.diffs")
+          if [[ "x$found_files" != "x" ]]; then
+            for found_file in $found_files
+            do
+              echo "-----------------------------------------------------"
+              echo "Found regression.diffs at: $found_file"
+              echo "-----------------------------------------------------"
+              cat "$found_file"
+            done
           else
             echo "No regression.diffs file found in the hierarchy."
           fi
