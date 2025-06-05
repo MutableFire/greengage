@@ -5,6 +5,8 @@
 name: Greenplum Build
 
 on:
+  release:
+    types: [published]
   push:
     branches: [ "OPENGPDB_STABLE", "OPENGPDB_6_27_STABLE", "MDB_6_25_STABLE_YEZZEY" ]
   pull_request:
@@ -1423,7 +1425,7 @@ jobs:
   ## ======================================================================
 
   upload_debian:
-    if: startsWith(github.ref_name , 'refs/tags/')
+    if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     name: Upload Debian Package
     needs: [build, deb-install-test]
