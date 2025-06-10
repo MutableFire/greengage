@@ -124,12 +124,14 @@ jobs:
                                "contrib/dict_int:installcheck",
                                "contrib/dict_xsyn:installcheck",
                                "contrib/extprotocol:installcheck",
+                               "contrib/file_fdw:installcheck",
                                "contrib/formatter_fixedwidth:installcheck",
                                "contrib/hstore:installcheck",
                                "contrib/indexscan:installcheck",
                                "contrib/intarray:installcheck",
                                "contrib/isn:installcheck",
                                "contrib/ltree:installcheck",
+                               "contrib/passwordcheck:installcheck",
                                "contrib/pg_trgm:installcheck",
                                "contrib/pgcrypto:installcheck",
                                "contrib/pgstattuple:installcheck",
@@ -138,17 +140,22 @@ jobs:
                                "contrib/test_parser:installcheck",
                                "contrib/test_shm_mq:installcheck",
                                "contrib/try_convert:generate-tests,installcheck",
-                               "contrib/unaccent:installcheck"]
+                               "contrib/tsearch2:installcheck",
+                               "contrib/unaccent:installcheck",
+                               "contrib/xml2:installcheck"]
               },
               {"test":"ic-gpcontrib",
                "make_configs":["gpcontrib/gp_array_agg:installcheck",
                                "gpcontrib/gp_debug_numsegments:installcheck",
+                               "gpcontrib/gp_distribution_policy:installcheck",
                                "gpcontrib/gp_error_handling:installcheck",
                                "gpcontrib/gp_inject_fault:installcheck",
+                               "gpcontrib/gp_internal_tools:installcheck",
                                "gpcontrib/gp_legacy_string_agg:installcheck",
                                "gpcontrib/gp_percentile_agg:installcheck",
                                "gpcontrib/gp_sparse_vector:installcheck",
                                "gpcontrib/gp_subtransaction_overflow:installcheck",
+                               "gpcontrib/gpmapreduce:installcheck",
                                "gpcontrib/orafce:installcheck"]
               },
               {"test":"ic-parallel-retrieve-cursor",
@@ -990,6 +997,20 @@ jobs:
             echo "Patching tests completed successfully"
           } 2>&1 | tee -a build-logs/details/patching-tests.log
 
+      - name: Run Greenplum configure script
+        env:
+          SRC_DIR: ${{ github.workspace }}
+        run: |
+          set -ex pipefail
+
+          # set env for debian build
+          export BUILD_DESTINATION=/opt/greenplum-db-6
+
+          if ! su - gpadmin -c "cd ${SRC_DIR} && ./configure --with-perl --with-python --with-libxml --enable-mapreduce --with-gssapi  --prefix=${BUILD_DESTINATION} --with-ldap --enable-gpperfmon --with-pam --with-openssl --disable-pxf --enable-ic-proxy  --enable-orafce --without-mdblocales --with-zstd"; then
+            echo "::error::Configure script failed"
+            exit 1
+          fi
+
       - name: Create Greenplum demo cluster
         env:
           SRC_DIR: ${{ github.workspace }}
@@ -1065,11 +1086,13 @@ jobs:
 
             cd ${SRC_DIR}
             if ! su - gpadmin -c "cd ${SRC_DIR} && \
+                 source ${SRC_DIR}/../gpdb/gpAux/gpdemo/gpdemo-env.sh && \
                  MAKE_NAME='${{ matrix.test }}-config$i' \
                  MAKE_TARGET='$target' \
                  MAKE_DIRECTORY='-C $dir' \
                  PGOPTIONS='${PG_OPTS}' \
                  SRC_DIR='${SRC_DIR}' \
+                 TEST_PGFDW=1 \
                  ${SRC_DIR}/../gpdb-devops/build_automation/gpdb/scripts/test-gpdb.sh" \
                  2>&1 | tee "$config_log";then
               echo "::warning::Test execution failed for configuration $((i+1)): make -C $dir $target"
