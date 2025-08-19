@@ -3457,6 +3457,16 @@ struct config_bool ConfigureNamesBool_gp[] =
 		NULL, NULL, NULL
 	},
 
+		{
+		{"gp_fts_maintenance", PGC_SIGHUP, GP_ARRAY_TUNING,
+		 gettext_noop("Don't run FTS probes, the cluster ARRAY has known issues"),
+		 NULL
+		},
+		&gp_fts_maintenance,
+		false,
+		NULL, NULL, NULL
+	},
+
 	/* End-of-list marker */
 	{
 		{NULL, 0, 0, NULL, NULL}, NULL, false, NULL, NULL
